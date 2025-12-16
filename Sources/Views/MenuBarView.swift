@@ -118,7 +118,8 @@ struct MenuBarView: View {
 										for port in group.ports {
 											Task { await state.killPort(port) }
 										}
-									}
+									},
+									state: state
 								)
 							}
 					} else {
@@ -203,6 +204,7 @@ struct ProcessGroupRow: View {
 	let isExpanded: Bool
 	let onToggleExpand: () -> Void
 	let onKillProcess: () -> Void
+	@Bindable var state: AppState
 	
 	@State private var showConfirm = false
 	@State private var isHovered = false
@@ -292,7 +294,7 @@ struct ProcessGroupRow: View {
 			// Expanded ports
 			if isExpanded {
 				ForEach(group.ports) { port in
-					NestedPortRow(port: port)
+					NestedPortRow(port: port, state: state)
 				}
 			}
 		}
@@ -303,6 +305,7 @@ struct ProcessGroupRow: View {
 
 struct NestedPortRow: View {
 	let port: PortInfo
+	@Bindable var state: AppState
 	
 	var body: some View {
 		HStack(spacing: 10) {
@@ -326,108 +329,188 @@ struct NestedPortRow: View {
 		.padding(.horizontal, 12)
 		.padding(.vertical, 6)
 		.contentShape(Rectangle())
+		.contextMenu {
+			Button { state.toggleFavorite(port.port) } label: {
+				Label(state.isFavorite(port.port) ? "Remove from Favorites" : "Add to Favorites",
+					  systemImage: state.isFavorite(port.port) ? "star.slash" : "star")
+			}
+			Divider()
+			Button { state.toggleWatch(port.port) } label: {
+				Label(state.isWatching(port.port) ? "Stop Watching" : "Watch Port",
+					  systemImage: state.isWatching(port.port) ? "eye.slash" : "eye")
+			}
+			Divider()
+			Button {
+				if let url = URL(string: "http://localhost:\(port.port)") {
+					NSWorkspace.shared.open(url)
+				}
+			} label: {
+				Label("Open in Browser",systemImage: "globe.fill")
+			}
+			
+			Button {
+				NSPasteboard.general.clearContents()
+				NSPasteboard.general.setString("http://localhost:\(port.port)", forType: .string)
+			} label: {
+				Label("Copy URL",systemImage: "document.on.clipboard")
+			}
+		}
+		.padding(.horizontal, 12)
+		.padding(.vertical, 6)
+		.contentShape(Rectangle())
+		.contextMenu {
+			Button { state.toggleFavorite(port.port) } label: {
+				Label(state.isFavorite(port.port) ? "Remove from Favorites" : "Add to Favorites",
+					  systemImage: state.isFavorite(port.port) ? "star.slash" : "star")
+			}
+			Divider()
+			Button { state.toggleWatch(port.port) } label: {
+				Label(state.isWatching(port.port) ? "Stop Watching" : "Watch Port",
+					  systemImage: state.isWatching(port.port) ? "eye.slash" : "eye")
+			}
+			Divider()
+			Button {
+				if let url = URL(string: "http://localhost:\(port.port)") {
+					NSWorkspace.shared.open(url)
+				}
+			} label: {
+				Label("Open in Browser",systemImage: "globe.fill")
+			}
+			
+			Button {
+				NSPasteboard.general.clearContents()
+				NSPasteboard.general.setString("http://localhost:\(port.port)", forType: .string)
+			} label: {
+				Label("Copy URL",systemImage: "document.on.clipboard")
+			}
+			
+			
+			Button {
+				NSPasteboard.general.setString("http://localhost:\(port.displayPort)", forType: .URL)
+			} label: {
+				Label("Copy URL",systemImage: "document.on.clipboard")
+			}
+		}
 	}
 }
-
+	
 // MARK: - List View Port Row
 
 struct PortRow: View {
-    let port: PortInfo
-    @Bindable var state: AppState
-    @Binding var confirmingKill: UUID?
-    @State private var isKilling = false
+	let port: PortInfo
+	@Bindable var state: AppState
+	@Binding var confirmingKill: UUID?
+	@State private var isKilling = false
 	@State private var isHovered = false
-
-    private var isConfirming: Bool { confirmingKill == port.id }
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(isKilling ? .orange : .green)
-                .frame(width: 8, height: 8)
-
-            if isConfirming {
-                Text("Kill \(port.processName)?")
-                    .font(.callout)
-                    .lineLimit(1)
-                Spacer()
-                HStack(spacing: 4) {
-                    Button("Kill") {
-                        isKilling = true
-                        confirmingKill = nil
-                        Task { await state.killPort(port) }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
-                    .controlSize(.small)
-                    Button("Cancel") { confirmingKill = nil }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                }
-            } else {
-                HStack(spacing: 3) {
-                    if state.isFavorite(port.port) {
-                        Image(systemName: "star.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.yellow)
-                    }
-                    Text(port.displayPort)
-                        .font(.system(.body, design: .monospaced))
-                        .fontWeight(.medium)
-                    if state.isWatching(port.port) {
-                        Image(systemName: "eye.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.blue)
-                    }
-                }
-                .frame(width: 80, alignment: .leading)
-                .opacity(isKilling ? 0.5 : 1)
-
-                Text(port.processName)
-                    .font(.callout)
-                    .lineLimit(1)
-                    .opacity(isKilling ? 0.5 : 1)
-
-                Spacer()
-
-                Text("PID \(port.pid)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .opacity(isKilling ? 0.5 : 1)
-
-                if isKilling {
-                    Image(systemName: "hourglass")
-                        .foregroundStyle(.orange)
-                } else {
-                    Button { confirmingKill = port.id } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
-                    .opacity(isHovered ? 1 : 0)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background((isHovered || isConfirming) ? Color.primary.opacity(0.05) : Color.clear)
-        .contentShape(Rectangle())
+	
+	private var isConfirming: Bool { confirmingKill == port.id }
+	
+	var body: some View {
+		HStack(spacing: 10) {
+			Circle()
+				.fill(isKilling ? .orange : .green)
+				.frame(width: 8, height: 8)
+			
+			if isConfirming {
+				Text("Kill \(port.processName)?")
+					.font(.callout)
+					.lineLimit(1)
+				Spacer()
+				HStack(spacing: 4) {
+					Button("Kill") {
+						isKilling = true
+						confirmingKill = nil
+						Task { await state.killPort(port) }
+					}
+					.buttonStyle(.borderedProminent)
+					.tint(.red)
+					.controlSize(.small)
+					Button("Cancel") { confirmingKill = nil }
+						.buttonStyle(.bordered)
+						.controlSize(.small)
+				}
+			} else {
+				HStack(spacing: 3) {
+					if state.isFavorite(port.port) {
+						Image(systemName: "star.fill")
+							.font(.caption2)
+							.foregroundStyle(.yellow)
+					}
+					Text(port.displayPort)
+						.font(.system(.body, design: .monospaced))
+						.fontWeight(.medium)
+					if state.isWatching(port.port) {
+						Image(systemName: "eye.fill")
+							.font(.caption2)
+							.foregroundStyle(.blue)
+					}
+				}
+				.frame(width: 80, alignment: .leading)
+				.opacity(isKilling ? 0.5 : 1)
+				
+				Text(port.processName)
+					.font(.callout)
+					.lineLimit(1)
+					.opacity(isKilling ? 0.5 : 1)
+				
+				Spacer()
+				
+				Text("PID \(port.pid)")
+					.font(.caption)
+					.foregroundStyle(.secondary)
+					.opacity(isKilling ? 0.5 : 1)
+				
+				if isKilling {
+					Image(systemName: "hourglass")
+						.foregroundStyle(.orange)
+				} else {
+					Button { confirmingKill = port.id } label: {
+						Image(systemName: "xmark.circle.fill")
+							.foregroundStyle(.red)
+					}
+					.buttonStyle(.plain)
+					.opacity(isHovered ? 1 : 0)
+				}
+			}
+		}
+		.padding(.horizontal, 12)
+		.padding(.vertical, 8)
+		.background((isHovered || isConfirming) ? Color.primary.opacity(0.05) : Color.clear)
+		.contentShape(Rectangle())
+		
 		.onHover { hovering in
 			isHovered = hovering
 		}
-        .contextMenu {
-            Button { state.toggleFavorite(port.port) } label: {
-                Label(state.isFavorite(port.port) ? "Remove from Favorites" : "Add to Favorites",
-                      systemImage: state.isFavorite(port.port) ? "star.slash" : "star")
-            }
-            Divider()
-            Button { state.toggleWatch(port.port) } label: {
-                Label(state.isWatching(port.port) ? "Stop Watching" : "Watch Port",
-                      systemImage: state.isWatching(port.port) ? "eye.slash" : "eye")
-            }
-        }
-    }
+		.contextMenu {
+			Button { state.toggleFavorite(port.port) } label: {
+				Label(state.isFavorite(port.port) ? "Remove from Favorites" : "Add to Favorites",
+					  systemImage: state.isFavorite(port.port) ? "star.slash" : "star")
+			}
+			Divider()
+			Button { state.toggleWatch(port.port) } label: {
+				Label(state.isWatching(port.port) ? "Stop Watching" : "Watch Port",
+					  systemImage: state.isWatching(port.port) ? "eye.slash" : "eye")
+			}
+			Divider()
+			Button {
+				if let url = URL(string: "http://localhost:\(port.port)") {
+					NSWorkspace.shared.open(url)
+				}
+			} label: {
+				Label("Open in Browser",systemImage: "globe.fill")
+			}
+			.keyboardShortcut("o", modifiers: .command)
+			
+			Button {
+				NSPasteboard.general.clearContents()
+				NSPasteboard.general.setString("http://localhost:\(port.port)", forType: .string)
+			} label: {
+				Label("Copy URL",systemImage: "document.on.clipboard")
+			}
+		}
+	}
 }
+
 
 // MARK: - Helper Functions
 

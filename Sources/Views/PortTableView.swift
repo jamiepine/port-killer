@@ -306,6 +306,24 @@ struct PortListRow: View {
                 }
                 .keyboardShortcut(.delete, modifiers: [])
             }
+            .keyboardShortcut(.delete, modifiers: [])
+			
+			Divider()
+			Button {
+				if let url = URL(string: "http://localhost:\(port.port)") {
+					NSWorkspace.shared.open(url)
+				}
+			} label: {
+				Label("Open in Browser",systemImage: "globe.fill")
+			}
+			.keyboardShortcut("o", modifiers: .command)
+			
+			Button {
+				NSPasteboard.general.clearContents()
+				NSPasteboard.general.setString("http://localhost:\(port.port)", forType: .string)
+			} label: {
+				Label("Copy URL",systemImage: "document.on.clipboard")
+			}
         }
     }
 
