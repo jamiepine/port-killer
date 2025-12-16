@@ -1,6 +1,6 @@
 import SwiftUI
 import ApplicationServices
-import UserNotifications
+@preconcurrency import UserNotifications
 import Sparkle
 import LaunchAtLogin
 import KeyboardShortcuts
