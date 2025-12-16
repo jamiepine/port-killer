@@ -17,7 +17,7 @@ swift build -c release
 # Patch SPM resource bundle accessors to check resourceURL (Contents/Resources) first
 # SPM generates accessors that only check bundleURL (app root), but macOS apps use Contents/Resources
 echo "🔧 Patching resource bundle accessors..."
-for accessor in .build/arm64-apple-macosx/release/*.build/DerivedSources/resource_bundle_accessor.swift; do
+for accessor in .build/*/release/*.build/DerivedSources/resource_bundle_accessor.swift; do
     if [ -f "$accessor" ]; then
         # Check if already patched
         if ! grep -q "resourceURL" "$accessor"; then
@@ -60,6 +60,12 @@ extension Foundation.Bundle {
 ACCESSOR_EOF
             # Replace placeholder with actual bundle name
             sed -i '' "s/BUNDLE_NAME_PLACEHOLDER/${bundle_name}/" "$accessor"
+
+            # Force recompilation by removing compiled object files
+            module_build_dir=$(dirname "$(dirname "$accessor")")
+            echo "  → Forcing recompilation of $bundle_name"
+            rm -f "$module_build_dir"/*.o 2>/dev/null || true
+            rm -f "$module_build_dir"/*.swiftmodule 2>/dev/null || true
         fi
     fi
 done
