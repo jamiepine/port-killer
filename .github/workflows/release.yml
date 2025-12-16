@@ -54,9 +54,31 @@ jobs:
           DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
         run: |
           APP_PATH=".build/release/PortKiller.app"
+          FRAMEWORKS_PATH="$APP_PATH/Contents/Frameworks"
 
-          # Sign with Developer ID (hardened runtime for notarization)
-          codesign --force --deep --options runtime \
+          # Sign Sparkle framework first (inside out signing)
+          if [ -d "$FRAMEWORKS_PATH/Sparkle.framework" ]; then
+            echo "Signing Sparkle framework..."
+            codesign --force --options runtime \
+              --sign "$DEVELOPER_ID_NAME" \
+              --timestamp \
+              "$FRAMEWORKS_PATH/Sparkle.framework/Versions/B/XPCServices/Installer.xpc"
+            codesign --force --options runtime \
+              --sign "$DEVELOPER_ID_NAME" \
+              --timestamp \
+              "$FRAMEWORKS_PATH/Sparkle.framework/Versions/B/Autoupdate"
+            codesign --force --options runtime \
+              --sign "$DEVELOPER_ID_NAME" \
+              --timestamp \
+              "$FRAMEWORKS_PATH/Sparkle.framework/Versions/B/Updater.app"
+            codesign --force --options runtime \
+              --sign "$DEVELOPER_ID_NAME" \
+              --timestamp \
+              "$FRAMEWORKS_PATH/Sparkle.framework"
+          fi
+
+          # Sign main app
+          codesign --force --options runtime \
             --sign "$DEVELOPER_ID_NAME" \
             --timestamp \
             "$APP_PATH"
