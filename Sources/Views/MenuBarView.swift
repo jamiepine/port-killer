@@ -6,9 +6,15 @@ struct MenuBarView: View {
     @State private var searchText = ""
 
     private func appIcon() -> NSImage {
-        if let url = Bundle.module.url(forResource: "ToolbarIcon@2x", withExtension: "png"),
-           let image = NSImage(contentsOf: url) {
-            return image
+        let candidates = [
+            Bundle.module.url(forResource: "ToolbarIcon@2x", withExtension: "png"),
+            Bundle.main.resourceURL?.appendingPathComponent("PortKiller_PortKiller.bundle/ToolbarIcon@2x.png")
+        ]
+
+        for candidate in candidates {
+            if let url = candidate, let image = NSImage(contentsOf: url) {
+                return image
+            }
         }
         return NSImage(systemSymbolName: "network", accessibilityDescription: nil) ?? NSImage()
     }
