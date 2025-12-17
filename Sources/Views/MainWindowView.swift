@@ -12,13 +12,18 @@ struct MainWindowView: View {
             SidebarView()
         } content: {
             contentView
+                .searchable(text: $state.filter.searchText, prompt: "Search ports, processes...")
         } detail: {
             detailView
         }
         .navigationSplitViewStyle(.balanced)
-        .searchable(text: $state.filter.searchText, prompt: "Search ports, processes...")
         .toolbar {
             toolbarContent
+        }
+        .onAppear {
+            // Ensure app is properly activated for keyboard input
+            NSApp.setActivationPolicy(.regular)
+            NSApp.activate(ignoringOtherApps: true)
         }
         .confirmationDialog(
             "Kill All Processes",
@@ -78,7 +83,7 @@ struct MainWindowView: View {
             PortDetailView(port: selectedPort)
         } else {
             ContentUnavailableView {
-                Label("No Port Selected", systemImage: "network")
+                Label("No Port Selected", systemImage: "network.slash")
             } description: {
                 Text("Select a port from the list to view details")
             }

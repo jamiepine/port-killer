@@ -29,7 +29,24 @@ struct MenuBarView: View {
 				processName: ports.first?.processName ?? "Unknown",
 				ports: ports.sorted { $0.port < $1.port }
 			)
-		}.sorted { $0.processName.localizedCaseInsensitiveCompare($1.processName) == .orderedAscending }
+		}.sorted { a, b in
+			// Check if groups have favorite or watched ports
+			let aHasFavorite = a.ports.contains(where: { state.isFavorite($0.port) })
+			let aHasWatched = a.ports.contains(where: { state.isWatching($0.port) })
+			let bHasFavorite = b.ports.contains(where: { state.isFavorite($0.port) })
+			let bHasWatched = b.ports.contains(where: { state.isWatching($0.port) })
+			
+			// Priority: Favorite > Watched > Neither
+			let aPriority = aHasFavorite ? 2 : (aHasWatched ? 1 : 0)
+			let bPriority = bHasFavorite ? 2 : (bHasWatched ? 1 : 0)
+			
+			if aPriority != bPriority {
+				return aPriority > bPriority
+			} else {
+				// Same priority, sort alphabetically by process name
+				return a.processName.localizedCaseInsensitiveCompare(b.processName) == .orderedAscending
+			}
+		}
 	}
 	
     private var filteredPorts: [PortInfo] {
@@ -46,16 +63,6 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Open PortKiller
-            MenuItemButton(title: "Open PortKiller", icon: "macwindow", shortcut: "O") {
-                openWindow(id: "main")
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    bringMainWindowToFront()
-                }
-            }
-
-            Divider()
-
             // Header
             HStack(spacing: 8) {
                 Image(systemName: "network")
@@ -97,9 +104,9 @@ struct MenuBarView: View {
                 LazyVStack(spacing: 0) {
                     if filteredPorts.isEmpty {
                         VStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle")
+                            Image(systemName: "network.slash")
                                 .font(.largeTitle)
-                                .foregroundStyle(.green)
+                                .foregroundStyle(.secondary)
                             Text("No open ports")
                                 .foregroundStyle(.secondary)
                         }
@@ -182,6 +189,13 @@ struct MenuBarView: View {
                 Divider()
                     .padding(.vertical, 4)
 
+                MenuItemButton(title: "Open PortKiller", icon: "macwindow", shortcut: "O") {
+                    openWindow(id: "main")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        bringMainWindowToFront()
+                    }
+                }
+
                 MenuItemButton(title: "Settings...", icon: "gear", shortcut: ",") {
                     state.selectedSidebarItem = .settings
                     openWindow(id: "main")
@@ -196,7 +210,7 @@ struct MenuBarView: View {
             }
             .padding(.vertical, 4)
         }
-        .frame(width: 300)
+        .frame(width: 340)
         .onAppear { updateGroupedByProcess() }
         .onChange(of: state.ports) { _, _ in updateGroupedByProcess() }
         .onChange(of: searchText) { _, _ in updateGroupedByProcess() }
@@ -237,9 +251,22 @@ struct ProcessGroupRow: View {
 					.animation(.easeInOut(duration: 0.3), value: isKilling)
 				
 				// Process name with port count
-				Text(group.processName)
-					.font(.callout)
-					.fontWeight(.medium)
+				HStack(spacing: 4) {
+					if group.ports.contains(where: { state.isFavorite($0.port) }) {
+						Image(systemName: "star.fill")
+							.font(.caption2)
+							.foregroundStyle(.yellow)
+					}
+					Text(group.processName)
+						.font(.callout)
+						.fontWeight(.medium)
+						.lineLimit(1)
+					if group.ports.contains(where: { state.isWatching($0.port) }) {
+						Image(systemName: "eye.fill")
+							.font(.caption2)
+							.foregroundStyle(.blue)
+					}
+				}
 				
 				Spacer()
 				
@@ -329,6 +356,7 @@ struct NestedPortRow: View {
 			Text("\(port.address) • \(port.displayPort)")
 				.font(.caption)
 				.foregroundStyle(.secondary)
+				.lineLimit(1)
 			
 			Spacer()
 		}
@@ -379,7 +407,10 @@ struct PortRow: View {
 		HStack(spacing: 10) {
 			Circle()
 				.fill(isKilling ? .orange : .green)
-				.frame(width: 8, height: 8)
+				.frame(width: 6, height: 6)
+				.shadow(color: (isKilling ? Color.orange : Color.green).opacity(0.5), radius: 3)
+				.opacity(isKilling ? 0.5 : 1)
+				.animation(.easeInOut(duration: 0.3), value: isKilling)
 			
 			if isConfirming {
 				Text("Kill \(port.processName)?")
@@ -409,13 +440,14 @@ struct PortRow: View {
 					Text(port.displayPort)
 						.font(.system(.body, design: .monospaced))
 						.fontWeight(.medium)
+						.lineLimit(1)
 					if state.isWatching(port.port) {
 						Image(systemName: "eye.fill")
 							.font(.caption2)
 							.foregroundStyle(.blue)
 					}
 				}
-				.frame(width: 80, alignment: .leading)
+				.frame(width: 100, alignment: .leading)
 				.opacity(isKilling ? 0.5 : 1)
 				
 				Text(port.processName)
